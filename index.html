@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CONSUL-AI — Multi-Agent Orchestration</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;700;800&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a26;
+    --border: rgba(255,255,255,0.07);
+    --border-bright: rgba(255,255,255,0.15);
+    --accent: #6c63ff;
+    --accent2: #00d4aa;
+    --accent3: #ff6b6b;
+    --accent4: #ffd166;
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --mono: 'DM Mono', monospace;
+    --sans: 'Noto Sans JP', sans-serif;
+    --display: 'Syne', sans-serif;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(108,99,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(108,99,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .wrapper { position: relative; z-index: 1; }
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.25rem 2rem;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(10,10,15,0.85);
+  }
+  .logo { font-family: var(--display); font-weight: 800; font-size: 1.1rem; letter-spacing: 0.05em; }
+  .logo span { color: var(--accent); }
+  .badge {
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    padding: 3px 10px;
+    border-radius: 100px;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    letter-spacing: 0.1em;
+  }
+  .api-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .api-bar label { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); white-space: nowrap; }
+  .api-bar input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border-bright);
+    border-radius: 6px;
+    padding: 0.4rem 0.75rem;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .api-bar input:focus { border-color: var(--accent); }
+  .tech-badge {
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(108,99,255,0.15);
+    color: var(--accent);
+    border: 1px solid rgba(108,99,255,0.3);
+    white-space: nowrap;
+  }
+  main {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: calc(100vh - 100px);
+  }
+  .input-panel {
+    border-right: 1px solid var(--border);
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+  .panel-title {
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+  .scenario-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.75rem;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s;
+    color: var(--text);
+    font-family: var(--sans);
+  }
+  .scenario-btn:hover, .scenario-btn.active {
+    border-color: var(--accent);
+    background: rgba(108,99,255,0.1);
+  }
+  .scenario-btn .s-icon { font-size: 1.2rem; display: block; margin-bottom: 0.4rem; }
+  .scenario-btn .s-label { font-size: 0.75rem; font-weight: 500; display: block; }
+  .scenario-btn .s-sub { font-size: 0.65rem; color: var(--muted); display: block; margin-top: 2px; }
+  .input-field { flex: 1; display: flex; flex-direction: column; gap: 0.5rem; }
+  .input-field label { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); }
+  textarea {
+    flex: 1;
+    min-height: 140px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 0.85rem;
+    line-height: 1.6;
+    resize: none;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  textarea:focus { border-color: var(--accent); }
+  .run-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0.9rem 2rem;
+    font-family: var(--display);
+    font-weight: 700;
+    font-size: 0.9rem;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+  }
+  .run-btn:hover:not(:disabled) { background: #7c75ff; transform: translateY(-1px); }
+  .run-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .right-panel {
+    display: flex;
+    flex-direction: column;
+  }
+  .orch-panel {
+    border-bottom: 1px solid var(--border);
+    padding: 1.5rem 2rem;
+  }
+  .pipeline {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    margin-top: 1rem;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+  }
+  .agent-node { flex-shrink: 0; display: flex; flex-direction: column; align-items: center; gap: 0.4rem; }
+  .agent-dot {
+    width: 52px; height: 52px;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem;
+    background: var(--surface);
+    transition: all 0.3s;
+    position: relative;
+  }
+  .agent-dot.active {
+    border-color: var(--accent);
+    background: rgba(108,99,255,0.15);
+    box-shadow: 0 0 20px rgba(108,99,255,0.4);
+  }
+  .agent-dot.done { border-color: var(--accent2); background: rgba(0,212,170,0.1); }
+  .agent-dot.active::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 14px;
+    border: 2px solid var(--accent);
+    opacity: 0.4;
+    animation: pulse-ring 1.5s ease-in-out infinite;
+  }
+  @keyframes pulse-ring { 0%,100%{transform:scale(1);opacity:0.4} 50%{transform:scale(1.08);opacity:0.1} }
+  .agent-name { font-family: var(--mono); font-size: 0.58rem; color: var(--muted); text-align: center; max-width: 60px; }
+  .agent-connector {
+    flex: 1; height: 2px;
+    background: var(--border);
+    min-width: 20px; max-width: 40px;
+    position: relative; top: -10px;
+    transition: background 0.3s;
+  }
+  .agent-connector.active { background: var(--accent); }
+  .agent-connector.done { background: var(--accent2); }
+  .output-panel {
+    padding: 1.5rem 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    overflow-y: auto;
+    flex: 1;
+    max-height: calc(100vh - 260px);
+  }
+  .agent-output {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: all 0.4s ease;
+  }
+  .agent-output.visible { opacity: 1; transform: translateY(0); }
+  .agent-output-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+  .agent-output-header .a-icon { font-size: 0.9rem; }
+  .agent-output-header .a-name { font-family: var(--mono); font-size: 0.7rem; font-weight: 500; }
+  .a-status {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: 0.6rem;
+    padding: 2px 8px;
+    border-radius: 100px;
+  }
+  .a-status.running { background: rgba(108,99,255,0.2); color: var(--accent); animation: blink 1s ease infinite; }
+  .a-status.done { background: rgba(0,212,170,0.15); color: var(--accent2); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .agent-output-body {
+    padding: 1rem;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+    font-family: var(--sans);
+    min-height: 60px;
+  }
+  .state-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    padding: 0.3rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    background: var(--surface);
+  }
+  .state-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .state-dot.active { background: var(--accent); animation: pulse-dot 1s ease infinite; }
+  .state-dot.done { background: var(--accent2); }
+  @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .empty-state {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 200px; color: var(--muted);
+    gap: 0.75rem; text-align: center;
+  }
+  .empty-state .big-icon { font-size: 2.5rem; opacity: 0.3; }
+  .empty-state p { font-size: 0.8rem; line-height: 1.6; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 2px; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+<header>
+  <div class="logo">CONSUL<span>-AI</span></div>
+  <div style="display:flex;gap:0.75rem;align-items:center;">
+    <span class="tech-badge">LangGraph</span>
+    <span class="tech-badge">FastAPI</span>
+    <span class="tech-badge">Claude Sonnet</span>
+    <div class="state-pill" id="globalState">
+      <span class="state-dot" id="stateDot"></span>
+      <span id="stateLabel">IDLE</span>
+    </div>
+    <div class="badge">MULTI-AGENT DEMO</div>
+  </div>
+</header>
+
+<div class="api-bar">
+  <label>ANTHROPIC API KEY</label>
+  <input type="password" id="apiKey" placeholder="sk-ant-..." />
+</div>
+
+<main>
+  <div class="input-panel">
+    <div class="panel-title">シナリオ選択</div>
+    <div class="scenario-grid">
+      <button class="scenario-btn active" data-idx="0" onclick="selectScenario(0)">
+        <span class="s-icon">🏭</span>
+        <span class="s-label">製造業AI導入</span>
+        <span class="s-sub">品質検査の自動化</span>
+      </button>
+      <button class="scenario-btn" data-idx="1" onclick="selectScenario(1)">
+        <span class="s-icon">🏥</span>
+        <span class="s-label">医療DX</span>
+        <span class="s-sub">カルテ処理の効率化</span>
+      </button>
+      <button class="scenario-btn" data-idx="2" onclick="selectScenario(2)">
+        <span class="s-icon">🏦</span>
+        <span class="s-label">金融リスク管理</span>
+        <span class="s-sub">不正検知AIの導入</span>
+      </button>
+      <button class="scenario-btn" data-idx="3" onclick="selectScenario(3)">
+        <span class="s-icon">✏️</span>
+        <span class="s-label">カスタム入力</span>
+        <span class="s-sub">自由に記述</span>
+      </button>
+    </div>
+    <div class="input-field">
+      <label>クライアント情報 / 課題</label>
+      <textarea id="clientInput" placeholder="クライアントの業種・規模・課題を入力..."></textarea>
+    </div>
+    <button class="run-btn" id="runBtn" onclick="runOrchestration()">
+      <span id="runBtnIcon">▶</span>
+      <span id="runBtnText">エージェント起動</span>
+    </button>
+  </div>
+
+  <div class="right-panel">
+    <div class="orch-panel">
+      <div class="panel-title">エージェント オーケストレーション</div>
+      <div class="pipeline" id="pipeline">
+        <div class="agent-node">
+          <div class="agent-dot" id="dot-issue_analysis">🔍</div>
+          <div class="agent-name">課題分析<br>Agent</div>
+        </div>
+        <div class="agent-connector" id="conn-0"></div>
+        <div class="agent-node">
+          <div class="agent-dot" id="dot-roi_estimation">📊</div>
+          <div class="agent-name">ROI試算<br>Agent</div>
+        </div>
+        <div class="agent-connector" id="conn-1"></div>
+        <div class="agent-node">
+          <div class="agent-dot" id="dot-roadmap">🗺️</div>
+          <div class="agent-name">ロードマップ<br>Agent</div>
+        </div>
+        <div class="agent-connector" id="conn-2"></div>
+        <div class="agent-node">
+          <div class="agent-dot" id="dot-final_proposal">📝</div>
+          <div class="agent-name">提案書<br>Agent</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="output-panel" id="outputPanel">
+      <div class="empty-state" id="emptyState">
+        <div class="big-icon">🤖</div>
+        <p>シナリオを選択して<br>「エージェント起動」を押してください</p>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script>
+const SCENARIOS = [
+  { text: `クライアント情報：\n業種：自動車部品メーカー（従業員800名）\n課題：品質検査工程に月3,000時間/人を投入しているが、見落としによる不良品の流出が月平均12件発生。\n現状：目視検査が主体。検査員の高齢化・人手不足が深刻化。\n予算感：年間3,000〜5,000万円で検討可能。` },
+  { text: `クライアント情報：\n業種：地域中核病院（病床数350床）\n課題：電子カルテの入力・サマリー作成に医師1人あたり日2〜3時間を消費。診察時間の圧迫が深刻。\n現状：既存EMRシステムあり。API連携は可能。\n予算感：初期1,500万・ランニング月100万まで。` },
+  { text: `クライアント情報：\n業種：地方銀行（総資産8,000億円規模）\n課題：法人融資審査に平均5営業日かかり、競合に案件を奪われている。不正取引検知の精度も低く、見逃しが月に数件。\n現状：レガシーシステムが多く、データのサイロ化が問題。\n予算感：中長期投資として年間1億円規模を想定。` },
+  { text: '' }
+];
+
+const NODE_ORDER = ['issue_analysis', 'roi_estimation', 'roadmap', 'final_proposal'];
+const NODE_META = {
+  issue_analysis:  { icon: '🔍', name: '課題分析 Agent',     color: '#6c63ff' },
+  roi_estimation:  { icon: '📊', name: 'ROI試算 Agent',      color: '#00d4aa' },
+  roadmap:         { icon: '🗺️',  name: 'ロードマップ Agent', color: '#ffd166' },
+  final_proposal:  { icon: '📝', name: '提案書サマリー Agent', color: '#ff6b6b' },
+};
+
+let isRunning = false;
+
+function selectScenario(idx) {
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-idx="${idx}"]`).classList.add('active');
+  document.getElementById('clientInput').value = SCENARIOS[idx].text;
+  if (idx === 3) document.getElementById('clientInput').focus();
+}
+
+selectScenario(0);
+
+function setGlobalState(state) {
+  const dot = document.getElementById('stateDot');
+  const label = document.getElementById('stateLabel');
+  dot.className = 'state-dot ' + ({ IDLE: '', RUNNING: 'active', COMPLETE: 'done', ERROR: '' }[state] || '');
+  label.textContent = state;
+}
+
+function resetPipeline() {
+  NODE_ORDER.forEach((node, i) => {
+    document.getElementById(`dot-${node}`).className = 'agent-dot';
+    if (i < 3) document.getElementById(`conn-${i}`).className = 'agent-connector';
+  });
+}
+
+function setNodeActive(nodeName) {
+  const idx = NODE_ORDER.indexOf(nodeName);
+  document.getElementById(`dot-${nodeName}`).className = 'agent-dot active';
+  if (idx > 0) {
+    document.getElementById(`conn-${idx - 1}`).className = 'agent-connector active';
+  }
+}
+
+function setNodeDone(nodeName) {
+  const idx = NODE_ORDER.indexOf(nodeName);
+  document.getElementById(`dot-${nodeName}`).className = 'agent-dot done';
+  if (idx < 3) document.getElementById(`conn-${idx}`).className = 'agent-connector done';
+}
+
+function createCard(nodeName) {
+  const meta = NODE_META[nodeName];
+  const card = document.createElement('div');
+  card.className = 'agent-output';
+  card.id = `card-${nodeName}`;
+  card.innerHTML = `
+    <div class="agent-output-header" style="border-left:3px solid ${meta.color}">
+      <span class="a-icon">${meta.icon}</span>
+      <span class="a-name" style="color:${meta.color}">${meta.name}</span>
+      <span class="a-status running" id="status-${nodeName}">RUNNING</span>
+    </div>
+    <div class="agent-output-body" id="body-${nodeName}">
+      <span style="color:var(--muted);font-family:var(--mono);font-size:0.7rem;">処理中...</span>
+    </div>`;
+  return card;
+}
+
+async function runOrchestration() {
+  if (isRunning) return;
+  const apiKey = document.getElementById('apiKey').value.trim();
+  const clientInput = document.getElementById('clientInput').value.trim();
+  if (!apiKey) { alert('APIキーを入力してください'); return; }
+  if (!clientInput) { alert('クライアント情報を入力してください'); return; }
+
+  isRunning = true;
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('runBtnText').textContent = '実行中...';
+  document.getElementById('runBtnIcon').textContent = '⏳';
+  setGlobalState('RUNNING');
+
+  const panel = document.getElementById('outputPanel');
+  panel.innerHTML = '';
+  resetPipeline();
+
+  // 全カードを先に作成（running状態で）
+  NODE_ORDER.forEach(node => {
+    const card = createCard(node);
+    panel.appendChild(card);
+    setNodeActive(node);
+    setTimeout(() => card.classList.add('visible'), 50);
+  });
+
+  try {
+    const resp = await fetch('/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ client_input: clientInput, api_key: apiKey }),
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      throw new Error(err.detail || 'API error');
+    }
+
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const parts = buffer.split('\n\n');
+      buffer = parts.pop();
+
+      for (const part of parts) {
+        const lines = part.trim().split('\n');
+        const eventLine = lines.find(l => l.startsWith('event:'));
+        const dataLine = lines.find(l => l.startsWith('data:'));
+        if (!eventLine || !dataLine) continue;
+
+        const event = eventLine.slice(6).trim();
+        const data = JSON.parse(dataLine.slice(5).trim());
+
+        if (event === 'node_complete') {
+          const { node, result } = data;
+          document.getElementById(`body-${node}`).innerHTML = (result || '').replace(/\n/g, '<br>');
+          document.getElementById(`status-${node}`).className = 'a-status done';
+          document.getElementById(`status-${node}`).textContent = 'DONE';
+          setNodeDone(node);
+        }
+
+        if (event === 'done') {
+          setGlobalState('COMPLETE');
+        }
+
+        if (event === 'error') {
+          throw new Error(data.message);
+        }
+      }
+    }
+  } catch (err) {
+    const errEl = document.createElement('div');
+    errEl.style.cssText = 'background:rgba(255,107,107,0.1);border:1px solid rgba(255,107,107,0.3);border-radius:10px;padding:1rem;font-family:var(--mono);font-size:0.75rem;color:#ff6b6b;margin-top:1rem;';
+    errEl.textContent = `エラー: ${err.message}`;
+    panel.appendChild(errEl);
+    setGlobalState('ERROR');
+  } finally {
+    isRunning = false;
+    document.getElementById('runBtn').disabled = false;
+    document.getElementById('runBtnText').textContent = '再実行';
+    document.getElementById('runBtnIcon').textContent = '↺';
+  }
+}
+</script>
+</body>
+</html>
